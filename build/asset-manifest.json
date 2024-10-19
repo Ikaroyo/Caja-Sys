@@ -1,0 +1,12 @@
+{
+  "files": {
+    "main.css": "/Caja-Sys/static/css/main.31d6cfe0.css",
+    "main.js": "/Caja-Sys/static/js/main.0ddddacb.js",
+    "index.html": "/Caja-Sys/index.html",
+    "main.0ddddacb.js.map": "/Caja-Sys/static/js/main.0ddddacb.js.map"
+  },
+  "entrypoints": [
+    "static/css/main.31d6cfe0.css",
+    "static/js/main.0ddddacb.js"
+  ]
+}

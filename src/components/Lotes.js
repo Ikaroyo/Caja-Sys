@@ -19,7 +19,10 @@ import {
   MenuItem,
   FormControl,
   InputLabel,
+  Snackbar,
+  Alert,
 } from "@mui/material";
+import cajeros from "../utils/cajeros"; // Importamos la lista de cajeros
 
 function Lotes() {
   const obtenerFechaActual = () => {
@@ -43,6 +46,12 @@ function Lotes() {
   });
 
   const [openConfirm, setOpenConfirm] = useState(false);
+  const [errors, setErrors] = useState({});
+  const [notification, setNotification] = useState({
+    open: false,
+    message: "",
+    severity: "success",
+  });
 
   useEffect(() => {
     calcularEfectivoOSM();
@@ -60,6 +69,11 @@ function Lotes() {
       ...prevState,
       [name]: value,
     }));
+
+    // Limpiar el error cuando el usuario empieza a escribir
+    if (name === "nroLote") {
+      setErrors((prev) => ({ ...prev, nroLote: "" }));
+    }
 
     if (name === "cajero") {
       localStorage.setItem("cajeroSeleccionado", value);
@@ -82,6 +96,17 @@ function Lotes() {
 
   const handleSubmit = (e) => {
     e.preventDefault();
+
+    // Validación del Nro. Lote
+    if (!formData.nroLote.trim()) {
+      setErrors((prev) => ({
+        ...prev,
+        nroLote: "El Nro. Lote no puede estar vacío",
+      }));
+      return;
+    }
+
+    setErrors({}); // Limpiar errores si la validación pasa
     setOpenConfirm(true);
   };
 
@@ -96,14 +121,39 @@ function Lotes() {
         body: JSON.stringify(formData),
       });
       if (response.ok) {
-        alert("Lote agregado con éxito");
+        setNotification({
+          open: true,
+          message: "Lote agregado con éxito",
+          severity: "success",
+        });
         // Limpiar el formulario o realizar otras acciones necesarias
+        setFormData({
+          fecha: obtenerFechaActual(),
+          cajero: localStorage.getItem("cajeroSeleccionado") || "",
+          nroLote: "",
+          osm: "",
+          municipalidad: "",
+          credito: "",
+          debito: "",
+          cheques: "",
+          otros: "",
+          efectivoOSM: "",
+          comentarios: "",
+        });
       } else {
-        alert("Error al agregar el lote");
+        setNotification({
+          open: true,
+          message: "Error al agregar el lote",
+          severity: "error",
+        });
       }
     } catch (error) {
       console.error("Error:", error);
-      alert("Error al enviar los datos");
+      setNotification({
+        open: true,
+        message: "Error al enviar los datos",
+        severity: "error",
+      });
     }
   };
 
@@ -148,9 +198,11 @@ function Lotes() {
               label="Cajero"
               required
             >
-              <MenuItem value="Carina">Carina</MenuItem>
-              <MenuItem value="Franco">Franco</MenuItem>
-              <MenuItem value="Silvio">Silvio</MenuItem>
+              {cajeros.map((cajero) => (
+                <MenuItem key={cajero.value} value={cajero.value}>
+                  {cajero.label}
+                </MenuItem>
+              ))}
             </Select>
           </FormControl>
         </Grid>
@@ -163,6 +215,9 @@ function Lotes() {
             fullWidth
             margin="dense"
             size="small"
+            error={!!errors.nroLote}
+            helperText={errors.nroLote}
+            required
           />
         </Grid>
         <Grid item xs={12} sm={6}>
@@ -308,6 +363,20 @@ function Lotes() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      <Snackbar
+        open={notification.open}
+        autoHideDuration={6000}
+        onClose={() => setNotification({ ...notification, open: false })}
+      >
+        <Alert
+          onClose={() => setNotification({ ...notification, open: false })}
+          severity={notification.severity}
+          sx={{ width: "100%" }}
+        >
+          {notification.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }

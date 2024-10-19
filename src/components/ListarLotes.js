@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import * as XLSX from "xlsx";
 import {
   TextField,
   Button,
@@ -23,10 +24,14 @@ import {
   IconButton,
   useMediaQuery,
   useTheme,
+  Snackbar,
+  Alert,
 } from "@mui/material";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import DeleteIcon from "@mui/icons-material/Delete";
 import FilterListIcon from "@mui/icons-material/FilterList";
+import GetAppIcon from "@mui/icons-material/GetApp";
+import cajeros from "../utils/cajeros";
 
 const BASE_URL = "http://localhost:3001"; // Asegúrate de que este es el puerto correcto
 
@@ -46,6 +51,11 @@ function ListarLotes() {
   const [openConfirmDialog, setOpenConfirmDialog] = useState(false);
   const [isEdited, setIsEdited] = useState(false);
   const [editedFields, setEditedFields] = useState({});
+  const [notification, setNotification] = useState({
+    open: false,
+    message: "",
+    severity: "success",
+  });
 
   const theme = useTheme();
   const isSmallScreen = useMediaQuery(theme.breakpoints.down("sm"));
@@ -54,9 +64,9 @@ function ListarLotes() {
     fetchLotes();
   }, []);
 
-  const fetchLotes = async () => {
+  const fetchLotes = async (currentFilters = filtros) => {
     try {
-      const queryParams = new URLSearchParams(filtros).toString();
+      const queryParams = new URLSearchParams(currentFilters).toString();
       const response = await fetch(
         `http://localhost:3001/api/lotes?${queryParams}`
       );
@@ -86,6 +96,9 @@ function ListarLotes() {
       ...prevState,
       [name]: value,
     }));
+    if (name === "cajero") {
+      fetchLotes({ ...filtros, [name]: value });
+    }
   };
 
   const aplicarFiltros = () => {
@@ -139,25 +152,44 @@ function ListarLotes() {
   const confirmUpdate = async () => {
     setOpenConfirmDialog(false);
     try {
-      const response = await fetch(
-        `http://localhost:3001/api/lotes/${editingLote.id}`,
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(editingLote),
-        }
-      );
+      if (!editingLote || !editingLote._id) {
+        console.error("No hay un lote seleccionado para actualizar");
+        return;
+      }
+
+      const id = editingLote._id.$oid || editingLote._id;
+      console.log("ID a actualizar:", id); // Para depuración
+
+      const response = await fetch(`http://localhost:3001/api/lotes/${id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(editingLote),
+      });
       if (response.ok) {
         setOpenEditDialog(false);
         fetchLotes();
+        setNotification({
+          open: true,
+          message: "Lote actualizado con éxito",
+          severity: "success",
+        });
       } else {
-        alert("Error al actualizar el lote");
+        const errorData = await response.json();
+        setNotification({
+          open: true,
+          message: `Error al actualizar el lote: ${errorData.error}`,
+          severity: "error",
+        });
       }
     } catch (error) {
       console.error("Error:", error);
-      alert("Error al enviar los datos");
+      setNotification({
+        open: true,
+        message: "Error al enviar los datos",
+        severity: "error",
+      });
     }
   };
 
@@ -168,22 +200,87 @@ function ListarLotes() {
 
   const handleDeleteConfirm = async () => {
     try {
-      const response = await fetch(
-        `http://localhost:3001/api/lotes/${loteToDelete.id}`,
-        {
-          method: "DELETE",
-        }
-      );
+      if (!loteToDelete || !loteToDelete._id) {
+        console.error("No se ha seleccionado un lote para eliminar");
+        return;
+      }
+
+      const id = loteToDelete._id.$oid || loteToDelete._id;
+      console.log("ID a eliminar:", id); // Para depuración
+
+      const response = await fetch(`http://localhost:3001/api/lotes/${id}`, {
+        method: "DELETE",
+      });
       if (response.ok) {
         setOpenDeleteDialog(false);
         fetchLotes();
+        setNotification({
+          open: true,
+          message: "Lote eliminado con éxito",
+          severity: "success",
+        });
       } else {
-        alert("Error al eliminar el lote");
+        const errorData = await response.json();
+        setNotification({
+          open: true,
+          message: `Error al eliminar el lote: ${errorData.error}`,
+          severity: "error",
+        });
       }
     } catch (error) {
       console.error("Error:", error);
-      alert("Error al eliminar el lote");
+      setNotification({
+        open: true,
+        message: "Error al eliminar el lote",
+        severity: "error",
+      });
     }
+  };
+
+  const exportToExcel = () => {
+    // Crear una copia de los lotes para manipular
+    const lotesParaExportar = lotes.map((lote) => {
+      const fecha = new Date(lote.fecha).toLocaleDateString();
+      return {
+        Fecha: fecha,
+        Cajero: lote.cajero,
+        "Nro Lote": lote.nroLote,
+        OSM: parseFloat(lote.osm) || 0,
+        Municipalidad: parseFloat(lote.municipalidad) || 0,
+        Crédito: parseFloat(lote.credito) || 0,
+        Débito: parseFloat(lote.debito) || 0,
+        Cheques: parseFloat(lote.cheques) || 0,
+        Otros: parseFloat(lote.otros) || 0,
+        "Efectivo OSM": parseFloat(lote.efectivoOSM) || 0,
+        Comentarios: lote.comentarios,
+      };
+    });
+
+    // Crear una nueva hoja de cálculo
+    const ws = XLSX.utils.json_to_sheet(lotesParaExportar);
+
+    // Ajustar el ancho de las columnas
+    const columnas = [
+      { wch: 15 }, // Fecha
+      { wch: 15 }, // Cajero
+      { wch: 10 }, // Nro Lote
+      { wch: 12 }, // OSM
+      { wch: 15 }, // Municipalidad
+      { wch: 12 }, // Crédito
+      { wch: 12 }, // Débito
+      { wch: 12 }, // Cheques
+      { wch: 12 }, // Otros
+      { wch: 15 }, // Efectivo OSM
+      { wch: 30 }, // Comentarios
+    ];
+    ws["!cols"] = columnas;
+
+    // Crear un nuevo libro y añadir la hoja
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Lotes");
+
+    // Generar el archivo Excel
+    XLSX.writeFile(wb, "Lotes_Exportados.xlsx");
   };
 
   return (
@@ -232,12 +329,25 @@ function ListarLotes() {
               label="Cajero"
             >
               <MenuItem value="">Todos</MenuItem>
-              <MenuItem value="Carina">Carina</MenuItem>
-              <MenuItem value="Franco">Franco</MenuItem>
-              <MenuItem value="Silvio">Silvio</MenuItem>
+              {cajeros.map((cajero) => (
+                <MenuItem key={cajero.value} value={cajero.value}>
+                  {cajero.label}
+                </MenuItem>
+              ))}
             </Select>
           </FormControl>
-          <IconButton onClick={aplicarFiltros} color="primary" size="small">
+          <IconButton
+            onClick={aplicarFiltros}
+            color="primary"
+            size="small"
+            sx={{
+              "&:hover": {
+                backgroundColor: "rgba(25, 118, 210, 0.04)",
+                transform: "scale(1.1)",
+                transition: "all 0.2s",
+              },
+            }}
+          >
             <FilterListIcon />
           </IconButton>
         </Box>
@@ -256,7 +366,7 @@ function ListarLotes() {
           </TableHead>
           <TableBody>
             {lotes.map((lote) => (
-              <TableRow key={lote.id}>
+              <TableRow key={lote._id.$oid}>
                 <TableCell>
                   {new Date(lote.fecha).toLocaleDateString()}
                 </TableCell>
@@ -285,9 +395,27 @@ function ListarLotes() {
           </TableBody>
         </Table>
       </TableContainer>
-      <Typography variant="h6" sx={{ mt: 2 }}>
-        Total Efectivo OSM: {totalEfectivoOSM.toFixed(2)}
-      </Typography>
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          mt: 2,
+          mb: 2,
+        }}
+      >
+        <Typography variant="h6">
+          Total Efectivo OSM: {totalEfectivoOSM.toFixed(2)}
+        </Typography>
+        <Button
+          variant="contained"
+          color="primary"
+          startIcon={<GetAppIcon />}
+          onClick={exportToExcel}
+        >
+          Exportar a Excel
+        </Button>
+      </Box>
 
       {/* Diálogo de Edición */}
       <Dialog
@@ -302,6 +430,30 @@ function ListarLotes() {
             {editingLote &&
               Object.entries(editingLote).map(([key, value]) => {
                 if (key === "id") return null;
+                if (key === "cajero") {
+                  return (
+                    <Grid item xs={12} sm={6} md={4} key={key}>
+                      <FormControl fullWidth margin="dense" size="small">
+                        <InputLabel id={`edit-${key}-label`}>
+                          {key.charAt(0).toUpperCase() + key.slice(1)}
+                        </InputLabel>
+                        <Select
+                          labelId={`edit-${key}-label`}
+                          name={key}
+                          value={value}
+                          onChange={handleEditChange}
+                          label={key.charAt(0).toUpperCase() + key.slice(1)}
+                        >
+                          {cajeros.map((cajero) => (
+                            <MenuItem key={cajero.value} value={cajero.value}>
+                              {cajero.label}
+                            </MenuItem>
+                          ))}
+                        </Select>
+                      </FormControl>
+                    </Grid>
+                  );
+                }
                 return (
                   <Grid item xs={12} sm={6} md={4} key={key}>
                     <TextField
@@ -412,6 +564,20 @@ function ListarLotes() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      <Snackbar
+        open={notification.open}
+        autoHideDuration={6000}
+        onClose={() => setNotification({ ...notification, open: false })}
+      >
+        <Alert
+          onClose={() => setNotification({ ...notification, open: false })}
+          severity={notification.severity}
+          sx={{ width: "100%" }}
+        >
+          {notification.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }
