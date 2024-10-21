@@ -1,0 +1,1 @@
+{"version":3,"file":"static/css/main.96a2f85a.css","mappings":"AAAA,KACI,eAAgB,CAChB,uBACJ","sources":["styles/index.css"],"sourcesContent":["body {\r\n    overflow-y: auto;\r\n    scrollbar-gutter: stable;\r\n}"],"names":[],"sourceRoot":""}
