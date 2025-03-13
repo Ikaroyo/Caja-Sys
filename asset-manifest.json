@@ -1,13 +1,13 @@
 {
   "files": {
     "main.css": "/Caja-Sys/static/css/main.96a2f85a.css",
-    "main.js": "/Caja-Sys/static/js/main.372df4fa.js",
+    "main.js": "/Caja-Sys/static/js/main.a7306537.js",
     "index.html": "/Caja-Sys/index.html",
     "main.96a2f85a.css.map": "/Caja-Sys/static/css/main.96a2f85a.css.map",
-    "main.372df4fa.js.map": "/Caja-Sys/static/js/main.372df4fa.js.map"
+    "main.a7306537.js.map": "/Caja-Sys/static/js/main.a7306537.js.map"
   },
   "entrypoints": [
     "static/css/main.96a2f85a.css",
-    "static/js/main.372df4fa.js"
+    "static/js/main.a7306537.js"
   ]
 }
